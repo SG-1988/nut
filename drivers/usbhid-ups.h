@@ -150,6 +150,10 @@ typedef struct {
 
 #define HU_CMD_MASK		0x2000
 
+#ifdef APC_MODBUS_HID
+#define HU_FLAG_MODBUS			256		/* MODBUS over HID command */
+#endif
+
 #define HU_INFOSIZE		128
 
 #define MAX_TRY		2		/* max number of GetItem retry */

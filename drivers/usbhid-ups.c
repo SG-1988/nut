@@ -28,7 +28,7 @@
  */
 
 #define DRIVER_NAME	"Generic HID driver"
-#define DRIVER_VERSION		"0.42"
+#define DRIVER_VERSION		"0.43"
 
 #include "main.h"
 #include "libhid.h"
@@ -514,6 +514,9 @@ static int match_function_subdriver(HIDDevice_t *d, void *privdata) {
 
 	for (i=0; subdriver_list[i] != NULL; i++) {
 		if (subdriver_list[i]->claim(d)) {
+#ifdef APC_MODBUS_HID
+			subdriver = subdriver_list[i];
+#endif
 			return 1;
 		}
 	}
@@ -748,6 +751,10 @@ void upsdrv_makevartable(void)
 #else
 	addvar(VAR_VALUE, "notification", "Set notification type, (ignored, only for backward compatibility)");
 #endif
+
+#ifdef APC_MODBUS_HID
+	addvar(VAR_VALUE, "slave", "MODBUS over HID. Slave number. "); 
+#endif
 }
 
 #define	MAX_EVENT_NUM	32
@@ -922,7 +929,8 @@ void upsdrv_initups(void)
 
 	subdriver_matcher = device_path;
 #else
-	char *regex_array[6];
+
+	char *regex_array[REGEX_ARRAY_SIZE];
 
 	upsdebugx(1, "upsdrv_initups...");
 
@@ -945,6 +953,9 @@ void upsdrv_initups(void)
 	regex_array[3] = getval("product");
 	regex_array[4] = getval("serial");
 	regex_array[5] = getval("bus");
+#ifdef APC_MODBUS_HID
+	regex_array[6] = getval("slave");
+#endif
 
 	ret = USBNewRegexMatcher(&regex_matcher, regex_array, REG_ICASE | REG_EXTENDED);
 	switch(ret)
@@ -957,7 +968,6 @@ void upsdrv_initups(void)
 		fatalx(EXIT_FAILURE, "invalid regular expression: %s", regex_array[ret]);
 	}
 
-	/* link the matchers */
 	subdriver_matcher->next = regex_matcher;
 #endif /* SHUT_MODE */
 
@@ -1097,6 +1107,7 @@ static int callback(hid_dev_handle_t udev, HIDDevice_t *hd, unsigned char *rdbuf
 #ifndef SHUT_MODE
 	int ret;
 #endif
+	upsdebugx(1, "usbhid-ups::callback...");
 	upsdebugx(2, "Report Descriptor size = %d", rdlen);
 	upsdebug_hex(3, "Report Descriptor", rdbuf, rdlen);
 
@@ -1117,14 +1128,16 @@ static int callback(hid_dev_handle_t udev, HIDDevice_t *hd, unsigned char *rdbuf
 		return 0;
 	}
 
+#ifndef APC_MODBUS_HID
 	/* select the subdriver for this device */
-	for (i=0; subdriver_list[i] != NULL; i++) {
+	for (i = 0; subdriver_list[i] != NULL; i++) {
 		if (subdriver_list[i]->claim(hd)) {
 			break;
 		}
 	}
 
 	subdriver = subdriver_list[i];
+#endif
 	if (!subdriver) {
 		upsdebugx(1, "Manufacturer not supported!");
 		return 0;

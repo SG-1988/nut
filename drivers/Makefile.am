@@ -43,7 +43,7 @@ SNMP_DRIVERLIST = snmp-ups
 USB_LIBUSB_DRIVERLIST = usbhid-ups bcmxcp_usb tripplite_usb \
  blazer_usb richcomm_usb riello_usb \
  nutdrv_atcl_usb \
- nutdrv_qx
+ nutdrv_qx apc-modbus-hid
 USB_DRIVERLIST = $(USB_LIBUSB_DRIVERLIST)
 NEONXML_DRIVERLIST = netxml-ups
 MACOSX_DRIVERLIST = macosx-ups
@@ -177,6 +177,13 @@ USBHID_UPS_SUBDRIVERS = apc-hid.c belkin-hid.c cps-hid.c explore-hid.c \
 usbhid_ups_SOURCES = usbhid-ups.c libhid.c libusb.c hidparser.c	\
  usb-common.c $(USBHID_UPS_SUBDRIVERS)
 usbhid_ups_LDADD = $(LDADD_DRIVERS) $(LIBUSB_LIBS)
+
+# APC MODBUS over USB HID
+apc_modbus_hid_SOURCES = usbhid-ups.c libhid.c libusb.c hidparser.c	\
+ usb-common.c $(USBHID_UPS_SUBDRIVERS)
+apc_modbus_hid_CFLAGS = $(AM_CFLAGS) -DAPC_MODBUS_HID
+apc_modbus_hid_LDADD = $(LDADD_DRIVERS) $(LIBUSB_LIBS)
+
 
 tripplite_usb_SOURCES = tripplite_usb.c libusb.c usb-common.c
 tripplite_usb_LDADD = $(LDADD_DRIVERS) $(LIBUSB_LIBS) -lm

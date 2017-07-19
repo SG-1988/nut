@@ -25,14 +25,14 @@
 #include "main.h"
 #include "apcupsd-ups.h"
 
-#define DRIVER_NAME	"apcupsd network client UPS driver"
-#define DRIVER_VERSION	"0.04"
+#define DRIVER_NAME	"apcupsd network client UPS driver with MODBUS support"
+#define DRIVER_VERSION	"0.05"
 
 /* driver description structure */
 upsdrv_info_t upsdrv_info = {
 	DRIVER_NAME,
 	DRIVER_VERSION,
-	"Andreas Steinmetz <ast@domdv.de>",
+	"Andreas Steinmetz <ast@domdv.de>, Dmitry Togushev <dmitry.togushev@schneider-electric.com",
 	DRV_STABLE,
 	{ NULL }
 };
@@ -249,7 +249,8 @@ void upsdrv_updateinfo(void)
 
 void upsdrv_shutdown(void)
 {
-	fatalx(EXIT_FAILURE, "shutdown not supported");
+	//fatalx(EXIT_FAILURE, "shutdown not supported");
+
 }
 
 void upsdrv_help(void)

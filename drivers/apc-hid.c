@@ -6,6 +6,9 @@
  *	2005		Peter Selinger <selinger@users.sourceforge.net>
  *	2009 - 2010	Arjen de Korte <adkorte-guest@alioth.debian.org>
  *
+ *
+ *  2017      Schneider Electric / Dmitry Togushev <dmitry.togushev@schneider-electric.com>
+ *
  *  Sponsored by MGE UPS SYSTEMS <http://www.mgeups.com>
  *   and Eaton <http://www.eaton.com>
  *
@@ -31,7 +34,13 @@
 #include "apc-hid.h"
 #include "usb-common.h"
 
-#define APC_HID_VERSION "APC HID 0.96"
+#ifdef APC_MODBUS_HID
+#define APC_HID_VERSION "APC MODBUS over HID 0.1"
+#else
+#define APC_HID_VERSION "APC HID 0.97"
+#endif
+
+#define APC_HID_MESSAGES_DEBUG_LEVEL 2
 
 /* APC */
 #define APC_VENDORID 0x051d
@@ -50,6 +59,7 @@ char * tweak_max_report[] = {
 /* Don't use interrupt pipe on 5G models (used by proprietary protocol) */
 static void *disable_interrupt_pipe(USBDevice_t *device)
 {
+	upsdebugx(APC_HID_MESSAGES_DEBUG_LEVEL, "apc-hid::disable_interrupt_pipe...");
 	if (use_interrupt_pipe == TRUE) {
 		upslogx(LOG_INFO, "interrupt pipe disabled (add 'pollonly' flag to 'ups.conf' to get rid of this message)");
 		use_interrupt_pipe= FALSE;
@@ -61,6 +71,7 @@ static void *disable_interrupt_pipe(USBDevice_t *device)
 static void *general_apc_check(USBDevice_t *device)
 {
 	int i = 0;
+	upsdebugx(APC_HID_MESSAGES_DEBUG_LEVEL, "apc-hid::general_apc_check...");
 
 	if (!device->Product) {
 		upslogx(LOG_WARNING, "device->Product is NULL so it is not possible to determine whether to activate max_report_size workaround");
@@ -99,6 +110,7 @@ static usb_device_id_t apc_usb_device_table[] = {
    done with result! */
 static const char *apc_date_conversion_fun(double value)
 {
+	upsdebugx(APC_HID_MESSAGES_DEBUG_LEVEL, "apc-hid::apc_date_conversion_fun...");
 	static char buf[20];
 	int year, month, day;
 
@@ -222,6 +234,10 @@ static usage_lkp_t apc_usage_lkp[] = {
 	{ "APCDelayBeforeReboot",	0xff86007c },
 	{ "APCDelayBeforeShutdown",	0xff86007d },
 	{ "APCDelayBeforeStartup",	0xff86007e }, /* FIXME: exploit */
+	/*MODBUS over HID Implementation in APC Smart-UPS http://www.apc.com/salestools/MPAO-98KJ7F/MPAO-98KJ7F_R1_EN.pdf */
+	{ "APCModbusRTURx",	0xff8600fc },
+	{ "APCModbusRTUTx",	0xff8600fd },
+
 	/* usage seen in dumps but unknown:
 	 * - ff860080
 	 * Path: UPS.PresentStatus.ff860080, Type: Input, ReportID: 0x33, Offset: 12, Size: 1, Value: 0
@@ -436,6 +452,12 @@ static hid_info_t apc_hid2nut[] = {
   { "beeper.disable", 0, 0, "UPS.PowerSummary.AudibleAlarmControl", NULL, "1", HU_TYPE_CMD, NULL },
   { "beeper.mute", 0, 0, "UPS.PowerSummary.AudibleAlarmControl", NULL, "3", HU_TYPE_CMD, NULL },
 
+  { "beeper.mute", 0, 0, "UPS.PowerSummary.AudibleAlarmControl", NULL, "3", HU_TYPE_CMD, NULL },
+  { "beeper.mute", 0, 0, "UPS.PowerSummary.AudibleAlarmControl", NULL, "3", HU_TYPE_CMD, NULL },
+#ifdef APC_MODBUS_HID
+  { "load.off.delay", 0, 0, "UPS.APCModbusRTUTx", NULL, "3", HU_FLAG_MODBUS & HU_TYPE_CMD, NULL },
+#endif
+
   /* end of structure. */
   { NULL, 0, 0, NULL, NULL, NULL, 0, NULL }
 };
@@ -443,6 +465,8 @@ static hid_info_t apc_hid2nut[] = {
 static const char *apc_format_model(HIDDevice_t *hd) {
 	static char model[64];
 	char *ptr1, *ptr2;
+
+	upsdebugx(APC_HID_MESSAGES_DEBUG_LEVEL, "apc-hid::apc_format_model...");
 
 	/* FIXME?: what is the path "UPS.APC_UPS_FirmwareRevision"? */
 	snprintf(model, sizeof(model), "%s", hd->Product ? hd->Product : "unknown");
@@ -464,10 +488,12 @@ static const char *apc_format_model(HIDDevice_t *hd) {
 }
 
 static const char *apc_format_mfr(HIDDevice_t *hd) {
+	upsdebugx(APC_HID_MESSAGES_DEBUG_LEVEL, "apc-hid::apc_format_mfr...");
 	return hd->Vendor ? hd->Vendor : "APC";
 }
 
 static const char *apc_format_serial(HIDDevice_t *hd) {
+	upsdebugx(APC_HID_MESSAGES_DEBUG_LEVEL, "apc-hid::apc_format_serial...");
 	return hd->Serial;
 }
 
@@ -475,8 +501,19 @@ static const char *apc_format_serial(HIDDevice_t *hd) {
  * the device is supported by this subdriver, else 0. */
 static int apc_claim(HIDDevice_t *hd) {
 
-	int status = is_usb_device_supported(apc_usb_device_table, hd);
+	upsdebugx(APC_HID_MESSAGES_DEBUG_LEVEL, "apc-hid::apc_claim...");
+#ifdef APC_MODBUS_HID
+	hd->MODBUSID = 1;   //TODO!!!
+#endif
 
+#ifdef APC_MODBUS_HID
+	upsdebugx(APC_HID_MESSAGES_DEBUG_LEVEL, "\thd->VendorID: %d\thd->ProductID: %d\thd->Vendor: %s\thd->Product: %s\thd->Serial: %s\thd->Bus: %s\thd->bcdDevice: %d\thd->MODBUSID: %d", hd->VendorID, hd->ProductID, hd->Vendor, hd->Product, hd->Serial, hd->Bus, hd->bcdDevice, hd->MODBUSID);
+#else
+	upsdebugx(APC_HID_MESSAGES_DEBUG_LEVEL, "\thd->VendorID: %d\thd->ProductID: %d\thd->Vendor: %s\thd->Product: %s\thd->Serial: %s\thd->Bus: %s\thd->bcdDevice: %d", hd->VendorID, hd->ProductID, hd->Vendor, hd->Product, hd->Serial, hd->Bus, hd->bcdDevice);
+#endif
+
+	int status = is_usb_device_supported(apc_usb_device_table, hd);
+	
 	switch (status) {
 
 		case POSSIBLY_SUPPORTED:

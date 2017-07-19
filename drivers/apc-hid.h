@@ -7,6 +7,9 @@
  *
  *  Sponsored by MGE UPS SYSTEMS <http://www.mgeups.com>
  *
+ *  2017      Schneider Electric / Dmitry Togushev <dmitry.togushev@schneider-electric.com>
+ *  
+ *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2 of the License, or
@@ -32,5 +35,11 @@
 extern subdriver_t apc_subdriver;
 
 extern int max_report_size;
+
+#ifdef APC_MODBUS_HID
+#define ModbusRTURx 0xFF8600FC
+#define ModbusRTUTx 0xFF8600FD
+#endif
+
 
 #endif /* APC_HID_H */
