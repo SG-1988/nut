@@ -33,7 +33,7 @@
 #include "nut_version.h"
 const char *UPS_VERSION = NUT_VERSION_MACRO;
 
-	int	nut_debug_level = 2;
+	int	nut_debug_level = 0;
 	int	nut_log_level = 0;
 	static	int	upslog_flags = UPSLOG_STDERR;
 
